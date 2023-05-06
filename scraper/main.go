@@ -26,17 +26,19 @@ func main() {
 		MustConnect()
 	defer browser.MustClose()
 
-	launcher.Open(browser.ServeMonitor(""))
-
 	scrapService := service.NewScrapService(browser)
 
 	result := scrapService.FindJobsPageURL(
 		context.Background(),
-		[]string{"backend", "developer"},
+		[]string{"backend", "developer", "go"},
 		"brazil",
 	)
 
-	for link := range result {
+	for _, link := range result {
 		fmt.Println(link)
 	}
+
+	fmt.Println("done")
+
+	l.Kill()
 }

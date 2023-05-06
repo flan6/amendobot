@@ -11,7 +11,7 @@ import (
 )
 
 type ScrapService interface {
-	FindJobsPageURL(ctx context.Context, keyWords []string, location string) chan string
+	FindJobsPageURL(ctx context.Context, keyWords []string, location string) []string
 }
 
 type scrapService struct {
@@ -26,53 +26,63 @@ func NewScrapService(broswer *rod.Browser) ScrapService {
 	return scrapService{broswer, logger}
 }
 
-func (s scrapService) FindJobsPageURL(ctx context.Context, keyWords []string, location string) chan string {
-	result := make(chan string)
+func (s scrapService) FindJobsPageURL(ctx context.Context, keyWords []string, location string) []string {
+	searchUrl := linkedin.GetSearchURL(keyWords, location, 1, 0)
 
-	go func(context.Context) {
-		initialPosition, initialPageNumber := 1, 0
-		searchUrl := linkedin.GetSearchURL(keyWords, location, initialPosition, initialPageNumber)
+	page := s.broswer.MustPage(searchUrl)
+	page.MustWaitLoad()
 
-		page := s.broswer.MustPage(searchUrl)
-		page.MustWaitLoad()
+	for {
+		cctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
-		seeAll := false
-		for !seeAll {
-			_, err := page.Eval("window.scrollTo(0, document.body.scrollHeight);")
-			if err != nil {
+		go func(cctx context.Context) {
+			for {
+				page.Eval("window.scrollTo(0, document.body.scrollHeight);")
+			}
+		}(cctx)
+
+		go func(cctx context.Context) {
+			for {
 				seeMoreBtn := page.MustElementX(linkedin.JobSeeMoreJobsButton)
 				if seeMoreBtn != nil {
-					err := page.Mouse.MoveTo(*seeMoreBtn.MustShape().OnePointInside()) // TODO : panics
+					seeMoreBtn.MustWaitVisible()
+
+					err := page.Mouse.MoveTo(*seeMoreBtn.MustShape().OnePointInside())
 					if err != nil {
 						s.logger.Println(err)
-						break
+						return
 					}
+
 					page.Mouse.MustClick(proto.InputMouseButtonLeft)
 				}
 			}
-			page.MustWaitLoad()
+		}(cctx)
 
-			viewedAllElement := page.MustElementX(linkedin.JobViewedAll)
-			if viewedAllElement != nil {
-				seeAll = true
-			}
-		}
+		viewedAllElement := page.MustElementX(linkedin.JobViewedAll)
+		if viewedAllElement != nil {
+			viewedAllElement.MustWaitVisible()
 
-		jobList, err := page.ElementX(linkedin.JobListXPath)
-		if err != nil {
-			s.logger.Fatal(err)
+			cancel()
+			break
 		}
+	}
 
-		jobsEntries, err := jobList.ElementsX(linkedin.JobEntriesXPath)
-		if err != nil {
-			s.logger.Fatal(err)
-		}
+	jobList, err := page.ElementX(linkedin.JobListXPath)
+	if err != nil {
+		s.logger.Fatal(err)
+	}
 
-		s.logger.Printf("found %d jobs", len(jobsEntries))
-		for _, jobEntry := range jobsEntries {
-			result <- *jobEntry.MustAttribute("href")
-		}
-	}(ctx)
+	jobsEntries, err := jobList.ElementsX(linkedin.JobEntriesXPath)
+	if err != nil {
+		s.logger.Fatal(err)
+	}
+
+	s.logger.Printf("found %d jobs", len(jobsEntries))
+	result := make([]string, 0, len(jobsEntries))
+	for _, jobEntry := range jobsEntries {
+		result = append(result, *jobEntry.MustAttribute("href"))
+	}
 
 	return result
 }
