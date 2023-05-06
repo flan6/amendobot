@@ -1,8 +1,9 @@
-package main
+package service_test
 
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -11,7 +12,7 @@ import (
 	"scraper/service"
 )
 
-func main() {
+func TestFindJobsAndSave(t *testing.T) {
 	l := launcher.New().
 		Headless(false).
 		Devtools(true)

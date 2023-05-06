@@ -64,11 +64,8 @@ func (r Repository[E]) Save(_ context.Context, data E) (E, error) {
 			)
 		},
 	)
-	if err != nil {
-		return data, err
-	}
 
-	return data, nil
+	return data, err
 }
 
 func (r Repository[E]) Get(_ context.Context, key string) (E, error) {
@@ -87,11 +84,8 @@ func (r Repository[E]) Get(_ context.Context, key string) (E, error) {
 			)
 		},
 	)
-	if err != nil {
-		return t, err
-	}
 
-	return t, nil
+	return t, err
 }
 
 func (r Repository[E]) GetFiltered(_ context.Context, filters ...entity.Filter[E]) ([]E, error) {
@@ -130,11 +124,8 @@ func (r Repository[E]) GetFiltered(_ context.Context, filters ...entity.Filter[E
 			return nil
 		},
 	)
-	if err != nil {
-		return nil, err
-	}
 
-	return res, nil
+	return res, err
 }
 
 func (r Repository[E]) CountFiltered(_ context.Context, filters ...entity.Filter[E]) (uint64, error) {
